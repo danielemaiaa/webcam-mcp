@@ -1,16 +1,54 @@
 import base64
 import json
+import sys
+import platform
 import cv2
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Webcam Controller")
 
+_OS = platform.system()  # "Windows", "Darwin", "Linux"
+
+# Cada OS usa um backend diferente do OpenCV
+_BACKENDS = {
+    "Windows": cv2.CAP_DSHOW,
+    "Darwin":  cv2.CAP_AVFOUNDATION,
+    "Linux":   cv2.CAP_V4L2,
+}
+_BACKEND = _BACKENDS.get(_OS, cv2.CAP_ANY)
+
+# Valores de auto_exposure variam por backend:
+# Windows/Mac (DirectShow/AVFoundation): 0.75 = auto, 0.25 = manual
+# Linux (V4L2): 3 = auto, 1 = manual
+_AUTO_EXPOSURE_ON  = 3    if _OS == "Linux" else 0.75
+_AUTO_EXPOSURE_OFF = 1    if _OS == "Linux" else 0.25
+
+# Faixas de exposure típicas por OS
+_EXPOSURE_RANGE = "1 a 10000 (microssegundos)" if _OS == "Linux" else "-11 a -1 (escala log; ex: -5 = médio)"
+
 
 def _open_camera(index: int):
-    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+    cap = cv2.VideoCapture(index, _BACKEND)
     if not cap.isOpened():
         raise ValueError(f"Não foi possível abrir a câmera {index}. Verifique se ela está conectada.")
     return cap
+
+
+@mcp.tool()
+def system_info() -> str:
+    """Mostra o sistema operacional detectado e o backend de câmera em uso."""
+    return json.dumps({
+        "sistema_operacional": _OS,
+        "versao": platform.version(),
+        "backend_opencv": {
+            "Windows": "CAP_DSHOW (DirectShow)",
+            "Darwin":  "CAP_AVFOUNDATION (AVFoundation)",
+            "Linux":   "CAP_V4L2 (Video4Linux2)",
+        }.get(_OS, "CAP_ANY (genérico)"),
+        "faixa_exposure": _EXPOSURE_RANGE,
+        "auto_exposure_on":  _AUTO_EXPOSURE_ON,
+        "auto_exposure_off": _AUTO_EXPOSURE_OFF,
+    }, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -18,7 +56,7 @@ def list_cameras() -> str:
     """Lista todas as webcams conectadas ao computador."""
     cameras = []
     for i in range(6):
-        cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+        cap = cv2.VideoCapture(i, _BACKEND)
         if cap.isOpened():
             cameras.append({
                 "index": i,
@@ -100,20 +138,20 @@ def adjust_camera(
     - brightness: -64 a 64  (0 = padrão)
     - contrast: 0 a 64      (32 = padrão)
     - saturation: 0 a 100   (64 = padrão)
-    - exposure: -11 a -1    (ex: -5 = médio; desative auto_exposure primeiro)
+    - exposure: Windows/Mac: -11 a -1 (ex: -5); Linux: 1 a 10000 microssegundos
     - sharpness: 0 a 100
     - gain: 0 a 100
     - auto_exposure: true = automático, false = manual
 
     Dica: desative auto_exposure (false) antes de ajustar exposure manualmente.
+    Use system_info() para ver o backend e faixas exatas do seu sistema.
     """
     cap = _open_camera(camera_index)
 
     aplicado = {}
 
     if auto_exposure is not None:
-        # 0.75 = automático, 0.25 = manual (padrão DirectShow Windows)
-        val = 0.75 if auto_exposure else 0.25
+        val = _AUTO_EXPOSURE_ON if auto_exposure else _AUTO_EXPOSURE_OFF
         cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, val)
         aplicado["auto_exposure"] = auto_exposure
 
@@ -169,7 +207,7 @@ def reset_camera(camera_index: int = 0) -> str:
     cap = _open_camera(camera_index)
 
     # Reativa auto-exposure e zera os ajustes manuais
-    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
+    cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, _AUTO_EXPOSURE_ON)
     cap.set(cv2.CAP_PROP_BRIGHTNESS, 0)
     cap.set(cv2.CAP_PROP_CONTRAST, 32)
     cap.set(cv2.CAP_PROP_SATURATION, 64)

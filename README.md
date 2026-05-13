@@ -2,7 +2,7 @@
 
 Permite conversar com o Claude Desktop para capturar imagens da webcam e ajustar brilho, contraste, exposição e outras configurações em tempo real.
 
-**Sistema operacional:** Windows 10 / 11
+**Sistemas operacionais:** Windows 10/11, macOS 12+, Linux (Ubuntu/Debian)
 **Câmera:** Webcam USB externa (melhor compatibilidade) ou câmera interna
 
 ---
@@ -32,14 +32,24 @@ Depois de instalar, basta digitar no Claude Desktop:
 
 ## Instalação
 
-### Opção A: Script automático (recomendado)
+### Windows
 
 1. Baixe ou clone este repositório
 2. Abra a pasta no Explorador de Arquivos
 3. Clique duas vezes em **`install.bat`**
 4. Siga as instruções que aparecem no terminal
 
-### Opção B: Manual
+### macOS / Linux
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+No macOS, o script cria o `claude_desktop_config.json` automaticamente.
+No Linux, instala `libgl1` e `libglib2.0-0` se necessário (dependências do OpenCV).
+
+### Manual (qualquer OS)
 
 Abra o **Prompt de Comando** na pasta do projeto e execute:
 
@@ -80,11 +90,14 @@ Após instalar as dependências, configure o Claude Desktop:
 
 | Ferramenta | O que faz |
 |---|---|
+| `system_info` | Mostra OS detectado, backend OpenCV e faixas de valores |
 | `list_cameras` | Lista todas as câmeras conectadas |
 | `capture_frame` | Tira uma foto e mostra ao Claude |
 | `get_camera_settings` | Mostra as configurações atuais |
 | `adjust_camera` | Ajusta brilho, contraste, exposição, etc. |
 | `reset_camera` | Volta para as configurações padrão |
+
+> Dica: comece sempre com `system_info()` para confirmar que o backend correto foi detectado.
 
 ---
 
@@ -95,7 +108,7 @@ Após instalar as dependências, configure o Claude Desktop:
 | `brightness` | -64 a 64 | 0 |
 | `contrast` | 0 a 64 | 32 |
 | `saturation` | 0 a 100 | 64 |
-| `exposure` | -11 a -1 | automático |
+| `exposure` | Windows/Mac: -11 a -1 \| Linux: 1-10000µs | automático |
 | `sharpness` | 0 a 100 | 50 |
 | `gain` | 0 a 100 | 0 |
 
